@@ -1,6 +1,8 @@
 var express = require("express");
 var bodyParser = require('body-parser');
 var XiabingChain = require('./xiabingchain')
+const uuidv1 = require('uuid/v1');
+const node_identifier = uuidv1();
 
 var http_port = process.env.HTTP_PORT || 8888;
 
@@ -9,10 +11,10 @@ var initHttpServer = () => {
   var app = express();
   app.use(bodyParser.json());
 
-  app.get('/blocks', (req, res) => res.send(JSON.stringify({
+  app.get('/blocks', (req, res) => res.send({
     chain: block.chain,
     length: block.chain.length,
-  })));
+  }));
 
   app.post('/transactions/new', (res, req) => {
     const values = req.body
@@ -29,19 +31,22 @@ var initHttpServer = () => {
   })
 
 
-  app.post('/mine', (req, res) => {
-    var newBlock = generateNextBlock(req.body.data);
-    addBlock(newBlock);
-    broadcast(responseLatestMsg());
-    console.log('block added: ' + JSON.stringify(newBlock));
-    res.send();
-  });
-  app.get('/peers', (req, res) => {
-    res.send(sockets.map(s => s._socket.remoteAddress + ':' + s._socket.remotePort));
-  });
-  app.post('/addPeer', (req, res) => {
-    connectToPeers([req.body.peer]);
-    res.send();
+  app.get('/mine', (req, res) => {
+    last_block = block.last_block
+    last_proof = block['proof'] || 0
+    proof = block.proof_of_work(last_proof)
+
+    block.new_transaction("0", node_identifier, 1)
+    new_block = block.new_block(proof)
+
+    let response = {
+      'message': "New Block Forged",
+      'index': new_block['index'],
+      'transactions': new_block['transactions'],
+      'proof': new_block['proof'],
+      'previous_hash': new_block['previous_hash'],
+    }
+    res.send(response);
   });
   app.listen(http_port, () => console.log('Listening http on port: ' + http_port));
 };

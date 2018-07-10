@@ -1,8 +1,32 @@
+var CryptoJS = require("crypto-js");
+var URL = require('url-parse');
 class XiabingChain {
   constructor(obj) {
     this.chain = []
     this.current_transactions = []
+    this.nodes = new Set()
     this.new_block(1, 100)
+  }
+  register_node(address) {
+    var url = new URL(address)
+    this.nodes.add(url.pathname)
+  }
+  valid_chain(chain) {
+    var last_block = chain[0]
+    var current_index = 1
+    while (current_index < chain.length) {
+      var block = chain[current_index]
+      var last_block_hash = this.hash(last_block)
+      if (block['previous_hash'] != last_block_hash) {
+        return false
+      }
+      if (!this.valid_proof(last_block['proof'], block['proof'], last_block_hash)) {
+        return false
+      }
+      last_block = block
+      current_index += 1
+    }
+    return true
   }
   new_block(proof, previous_hash) {
     let block = {
@@ -38,8 +62,10 @@ class XiabingChain {
     return proof
   }
   valid_proof(last_proof, proof){
-    let guess = last_proof + proof
-    const guess_hash = CryptoJS.SHA256(guess).hexdigest()
+    let guess = '' + last_proof + proof
+    console.log('guess', guess)
+    const guess_hash = CryptoJS.SHA256(guess).toString(CryptoJS.enc.Hex)
+    console.log('guess_hash', guess_hash)
     return guess_hash.substr(0, 4) === '0000'
   }
 }
