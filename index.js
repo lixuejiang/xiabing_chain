@@ -11,7 +11,7 @@ var initHttpServer = () => {
   var app = express();
   app.use(bodyParser.json());
 
-  app.get('/blocks', (req, res) => res.send({
+  app.get('/chain', (req, res) => res.send({
     chain: block.chain,
     length: block.chain.length,
   }));
@@ -29,15 +29,14 @@ var initHttpServer = () => {
       response
     )
   })
-
-
   app.get('/mine', (req, res) => {
-    last_block = block.last_block
-    last_proof = block['proof'] || 0
-    proof = block.proof_of_work(last_proof)
+    var last_block = block.last_block()
+    var last_proof = block['proof'] || 0
+    var proof = block.proof_of_work(last_proof)
+    var previous_hash = block.hash(last_block)
 
     block.new_transaction("0", node_identifier, 1)
-    new_block = block.new_block(proof)
+    new_block = block.new_block(proof, previous_hash)
 
     let response = {
       'message': "New Block Forged",
@@ -48,6 +47,38 @@ var initHttpServer = () => {
     }
     res.send(response);
   });
+  app.post('/nodes/register', (req, res) => {
+    const values = req.body
+    console.log(values)
+    var nodes = values['nodes']
+    if (!nodes) {
+      res.send("Error: Please supply a valid list of nodes", 400)
+    }
+    for (var node in nodes) {
+      block.register_node(node)
+    }
+    response = {
+      'message': 'New nodes have been added',
+      'total_nodes': block.nodes.length,
+    }
+    res.send(response)
+  })
+  app.get('/nodes/resolve', (req, res) => {
+    var replaced = block.resolve_conflicts()
+    if (replaced) {
+      response = {
+        'message': 'Our chain was replaced',
+        'new_chain': block.chain
+      }
+    } else {
+      response = {
+        'message': 'Our chain is authoritative',
+        'chain': block.chain
+      }
+    }
+    
+    res.send(response)
+  })
   app.listen(http_port, () => console.log('Listening http on port: ' + http_port));
 };
 

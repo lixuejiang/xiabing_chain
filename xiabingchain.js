@@ -1,5 +1,6 @@
 var CryptoJS = require("crypto-js");
 var URL = require('url-parse');
+var request = require('request-promise')
 class XiabingChain {
   constructor(obj) {
     this.chain = []
@@ -10,6 +11,27 @@ class XiabingChain {
   register_node(address) {
     var url = new URL(address)
     this.nodes.add(url.pathname)
+  }
+  async resolve_conflicts() {
+    var neighbours = this.nodes
+    var new_chain = null
+    var maxLength = this.chain.length
+    for(var node in neighbours) {
+      let response = await request.get(`http://${node}/chain`)
+      if (response) {
+        var length = response.length
+        var chain = response.chain
+        if (length > maxLength && this.valid_chain(chain)) {
+          maxLength = length
+          new_chain = chain
+        }
+      }
+    }
+    if (new_chain) {
+      this.chain = new_chain
+      return true
+    }
+    return false
   }
   valid_chain(chain) {
     var last_block = chain[0]
@@ -49,10 +71,10 @@ class XiabingChain {
       'recipient': recipient,
       'amount': amount,
     })
-    return this.last_block['index'] + 1
+    return this.last_block()['index'] + 1
   }
   hash(block){
-    CryptoJS.SHA256(JSON.stringify(block)).toString();
+    return CryptoJS.SHA256(JSON.stringify(block)).toString();
   }
   proof_of_work(last_proof) {
     let proof = 0
@@ -63,9 +85,7 @@ class XiabingChain {
   }
   valid_proof(last_proof, proof){
     let guess = '' + last_proof + proof
-    console.log('guess', guess)
     const guess_hash = CryptoJS.SHA256(guess).toString(CryptoJS.enc.Hex)
-    console.log('guess_hash', guess_hash)
     return guess_hash.substr(0, 4) === '0000'
   }
 }
